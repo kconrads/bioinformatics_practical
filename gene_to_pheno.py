@@ -1,6 +1,7 @@
 from flask import Flask, jsonify
 import re
 from collections import defaultdict
+import requests
 
 app = Flask(__name__)
 
