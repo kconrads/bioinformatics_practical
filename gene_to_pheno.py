@@ -51,7 +51,6 @@ def getStart():
 
 @app.route('/<string:FBgn>/')
 def getPheno(FBgn):
-
     data = list(filter(None, map(phenotype.get, genotype[FBgn])))
     response = app.response_class(
         response=json.dumps(data),
