@@ -52,14 +52,13 @@ def getStart():
 @app.route('/<string:FBgn>/')
 def getPheno(FBgn):
 
-    phenotype_output = list(filter(None, map(phenotype.get, genotype[FBgn])))
-
-    if genotype.get(FBgn, 0) == 0:
-        return jsonify('Gene not found!')
-    elif not phenotype_output:
-        return jsonify('No phenotype found for this gene')
-    else:
-        return jsonify(phenotype_output)
+    data = list(filter(None, map(phenotype.get, genotype[FBgn])))
+    response = app.response_class(
+        response=json.dumps(data),
+        status=200,
+        mimetype='application/json'
+    )
+    return response
 
 if __name__ == '__main__':
     app.run(debug=True)
