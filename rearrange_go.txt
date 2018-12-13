@@ -1,0 +1,20 @@
+
+input_fl = "INPUT_FILE_NAME"
+output = open("custom_annotation.txt", "w")
+
+with open(input_fl) as fl:
+	for line in fl:
+		line = line.strip()
+		cols = line.split("\t")
+		ID = cols[0]
+		# sometimes there is no go_term (i.e. column 13)
+		try:
+			go_term = cols[13]
+		except:
+			continue
+		# now loop through each go term and write one per line
+		go_terms = go_term.split("|")
+		for go in go_terms:
+			go_num = go.lstrip("GO:")
+			output.write(ID + " = " + go_num + "\n")
+			
