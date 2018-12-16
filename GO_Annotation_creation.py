@@ -40,13 +40,6 @@ with open(filename) as fl:
             for x in go_ID_list[k]:
                 go_ID[x] = k
 
-#print(go_ID_list)
-
-
-#print(x)
-print(go_ID_list)
-print(go_ID)
-
 save_name = gene_name + '_%i.tsv'
 
 for i, k in enumerate(go_ID):
