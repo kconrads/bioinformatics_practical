@@ -58,7 +58,7 @@ for i, k in enumerate(go_ID):
         DB_object_synonym = ''
         DB_object_type = 'Protein'
         Taxon = 'taxon:7070'
-        Date = ''.join(date.split(',')[::-1])
+        Date = ''.join(date.split('-')[::-1])
         Assign_DB = 'iBB'
         Annotation_extension = ''
         Gene_product_form_id = ''
