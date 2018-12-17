@@ -2,7 +2,6 @@ import requests
 import csv
 
 filename = 'knirps_test.fasta_1.tsv'
-go_ID_list = {}
 go_ID = {}
 
 def get_Aspect(x):
