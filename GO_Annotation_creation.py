@@ -28,7 +28,7 @@ with open(filename) as fl:
         except:
             continue
         ID = cols[11]
-        gene_name = cols[0]
+        gene_name = cols[0].split('|')[2]
         date = cols[10]
         # now loop through each go term and write one per line
         go_terms = go_term.split("|")
