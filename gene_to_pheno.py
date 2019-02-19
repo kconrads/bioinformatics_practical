@@ -136,7 +136,7 @@ def getPheno(FBgn):
         for structure in phenotype.get(gene):
             if structure is not None and structure not in pheno_list:
                 pheno_list.append(structure)
-                pheno_list_match.append(structure.replace("pupal ", "").replace("adult ", '').replace("larva ", "").replace("embryo ",''))
+                pheno_list_match.append(structure.replace("pupal ", "").replace("adult ", '').replace("larva ", "").replace("embryo ",'').replace("embryonic ",''))
 
     match_list = []
 
