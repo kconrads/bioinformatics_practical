@@ -10,7 +10,7 @@ app = Flask(__name__)
 
 phenotype = defaultdict(list)
 genotype = defaultdict(list)
-ontology_terms = []
+ontology_terms = set()
 developemental_stages = ['pupa', 'pupa_male', 'pupa_female', 'adult', 'adult_female', 'adult_male', 'egg', 'mature_egg',
                          'larva', 'L1_larva', 'late_larva_(L5+)', 'L7_larva', 'embryo', 'prepupa']
 
