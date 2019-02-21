@@ -38,7 +38,7 @@ def get_TCN(FBgn):
 
 def get_tron(TrOn):
     TrOn_request_url = 'http://smallsrv-vm:9998/tribolium/cls/' + TrOn
-    TrOn_info = requests.get(TrOn_request_url).text
+    TrOn_info = requests.get(TrOn_request_url, headers = {'Accept': 'application/json'}).text
     TrOn_list = json.loads(TrOn_info)
     return TrOn_list
 
