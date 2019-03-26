@@ -5,14 +5,79 @@ from collections import defaultdict
 import requests
 from mysql.connector import MySQLConnection, Error
 from db_config import read_db_config
+import gzip
+import ftplib
+from ftplib import FTP
+import os
+import fnmatch
 
 app = Flask(__name__)
+
+## File Update
+with FTP('ftp.flybase.org') as ftp:
+    try:
+        ftp.login()
+        ftp.cwd('/releases/current/')
+        files = ftp.nlst()
+        current_name = files[0].strip()
+
+        with open('current_release.txt', 'r+') as current_release:
+            current_dl_name = current_release.readlines()[-1].strip()
+
+            if current_dl_name != current_name:
+                print('Updating necessary files...')
+
+                ftp.cwd('precomputed_files/alleles/')
+                alleles_files = ftp.nlst()
+
+                for f in alleles_files:
+                    if fnmatch.fnmatch(f, 'allele_phenotypic_data_fb_*'):
+                        local_dir = os.path.dirname(os.path.realpath(__file__))
+                        local_filename = os.path.join(local_dir, f)
+
+                        with open(local_filename, 'wb') as output:
+                            print('Downloading ' + f + '...')
+                            ftp.retrbinary('RETR %s' % f, output.write)
+                            print('Downloading complete!')
+
+                    elif fnmatch.fnmatch(f, 'fbal_to_fbgn_fb_*'):
+                        local_dir = os.path.dirname(os.path.realpath(__file__))
+                        local_filename = os.path.join(local_dir, f)
+
+                        with open(local_filename, 'wb') as output:
+                            print('Downloading ' + f + '...')
+                            ftp.retrbinary('RETR %s' % f, output.write)
+                            print('Downloading complete!')
+
+                ftp.cwd('../ontologies/')
+
+                ontology_files = ftp.nlst()
+
+                for f in ontology_files:
+                    if fnmatch.fnmatch(f, 'fly_anatomy*'):
+                        local_dir = os.path.dirname(os.path.realpath(__file__))
+                        local_filename = os.path.join(local_dir, f)
+
+                        with open(local_filename, 'wb') as output:
+                            print('Downloading ' + f + '...')
+                            ftp.retrbinary('RETR %s' % f, output.write)
+                            print('Downloading complete!')
+
+                current_release.write(current_name + '\n')
+
+            else:
+                print('Up to date!')
+
+    except ftplib.all_errors as e:
+        print('FTP error:', e)
 
 phenotype = defaultdict(list)
 genotype = defaultdict(list)
 ontology_terms = set()
 developemental_stages = ['pupa', 'pupa_male', 'pupa_female', 'adult', 'adult_female', 'adult_male', 'egg', 'mature_egg',
                          'larva', 'L1_larva', 'late_larva_(L5+)', 'L7_larva', 'embryo', 'prepupa']
+FBgn_GO = defaultdict(list)
+TCN_GO = defaultdict(list)
 
 # Splits text at any special character, takes first output
 def extract_morph_structure(x):
@@ -24,11 +89,17 @@ def extract_morph_structure(x):
 # Only gets the ontolotgy if it hasn't already been done
 def get_ontology_terms():
     if (len(ontology_terms) < 1):
-        with open('fly_anatomy.obo') as fly_ontology:
+        with gzip.open('fly_anatomy.obo.gz','rt', encoding="utf-8") as fly_ontology:
             for line in fly_ontology:
                 if (line.startswith('name:')):
-                    ontology_terms.append(line.split(':')[1].strip())
+                    ontology_terms.add(line.split(':')[1].strip())
     return ontology_terms
+
+def get_FBgn(TCN):
+    FBgn_request_url = 'http://ibeetle-base.uni-goettingen.de/ibp/idmapper/TC2FBgn/' + TCN
+    FBgn = requests.get(FBgn_request_url).text
+    FBgn_list = json.loads(FBgn)
+    return FBgn_list
 
 def get_TCN(FBgn):
     TCN_request_url = 'http://ibeetle-base.uni-goettingen.de/ibp/idmapper/FBgn2TC/' + FBgn
@@ -62,10 +133,8 @@ def query_with_fetchone(TCN):
         WHERE tg.tCNumber = %s'''
         cursor.execute(stmt, (TCN,))
         rows = cursor.fetchall()
-
-        #for i in range(len(pheno_table[0])):
-        # pheno_list.append(pheno_table[0][i][5].decode())
         output = []
+
         for row in rows:
             value =row[0]
             if (value is not None) and (value.decode() not in output):
@@ -80,8 +149,13 @@ def query_with_fetchone(TCN):
         conn.close()
 
 
+with open('current_release.txt') as current_release:
+    current_dl_name = current_release.readlines()[-1].strip()
+    current_file_version = current_dl_name.split('FB')[1].strip()
+
+
 # Creating phenotype
-with open('allele_phenotypic_data_fb_2018_05.tsv') as allele_pheno:
+with gzip.open('allele_phenotypic_data_fb_' + current_file_version + '.tsv.gz', 'rt', encoding="utf-8") as allele_pheno:
     for line in allele_pheno:
         if (line.startswith('#') or line.startswith('\n')): # skipping # and blankspace
             continue
@@ -93,23 +167,54 @@ with open('allele_phenotypic_data_fb_2018_05.tsv') as allele_pheno:
             phenotype[cols[1]].append(structure) #otherwise the list of pheno-traits appended
 
 # Used defaultdict from collections
-with open('fbal_to_fbgn_fb_2018_05.tsv') as allele_gene:
+with gzip.open('fbal_to_fbgn_fb_' + current_file_version + '.tsv.gz', 'rt', encoding="utf-8") as allele_gene:
     for line in allele_gene:
         if (line.startswith('#') or line.startswith('\n')):
             continue
         cols = line.split("\t")
         genotype[cols[2]].append(cols[0])
 
+
+with open('gene_association.fb') as fly_GO:
+    for line in fly_GO:
+        if line.startswith("!"):
+            continue
+        cols = line.split("\t")
+        if (cols[1] not in FBgn_GO):
+            FBgn_GO[cols[1]] = []
+        GO_term = cols[4]
+        if (GO_term is not None):
+            FBgn_GO[cols[1]].append(GO_term)
+
+with open('GO_Annotation.tsv') as beetle_GO:
+    for line in beetle_GO:
+        if line.startswith("!"):
+            continue
+        cols = line.split("\t")
+        if (cols[1] not in TCN_GO):
+            TCN_GO[cols[1]] = []
+        GO_term = cols[4]
+        if (GO_term is not None):
+            TCN_GO[cols[1]].append(GO_term)
+
 @app.route('/')
 def getStart():
     return 'Please enter FBgn!'
 
 
-@app.route('/<string:FBgn>/')
-def getPheno(FBgn):
+@app.route('/FBgn2TCN/<string:FBgn>')
+def get_TCN_Pheno(FBgn):
 
     TCN_dict = get_TCN(FBgn)
     TCN_list = TCN_dict[FBgn]
+
+    fly_GO_list = FBgn_GO[FBgn]
+
+    beetle_GO_list_unformatted = []
+    for tcn in TCN_list:
+        beetle_GO_list_unformatted.append(TCN_GO[tcn])
+
+    beetle_GO_list_formatted = [j for i in beetle_GO_list_unformatted for j in i]
 
     tron_list = []
     for tcn in TCN_list:
@@ -119,6 +224,8 @@ def getPheno(FBgn):
     for i in range(len(tron_list)):
         for j in tron_list[i]:
             tron_list2.append(get_tron(j))
+
+    tron_list_formatted = [j for i in tron_list for j in i]
 
     tron_descriptors = []
     for tron in tron_list2:
@@ -136,7 +243,7 @@ def getPheno(FBgn):
         for structure in phenotype.get(gene):
             if structure is not None and structure not in pheno_list:
                 pheno_list.append(structure)
-                pheno_list_match.append(structure.replace("pupal ", "").replace("adult ", '').replace("larva ", "").replace("embryo ",'').replace("embryonic ",''))
+                pheno_list_match.append(structure.replace("pupal ", "").replace("adult ", '').replace("larva ", "").replace("embryo ",'').replace("embryonic", ""))
 
     match_list = []
 
@@ -146,11 +253,84 @@ def getPheno(FBgn):
             if tcas_structure in pheno_list_match:
                 match_list.append(tcas_structure)
 
+    GO_terms_match = list(set(fly_GO_list) & set(beetle_GO_list_formatted))
+
     data = {'FBgn_morph_pheno': pheno_list,
+            'FBgn_GO_terms': fly_GO_list,
             'FBgn_to_TCN': TCN_list,
-            'TrOn_list': tron_list,
+            'TCN_GO_terms': beetle_GO_list_formatted,
+            'TrOn_list': tron_list_formatted,
             'TrOn_descriptors': tron_descriptors,
-            'Common': match_list}
+            'Common': match_list,
+            'Shared_GO_terms': GO_terms_match}
+    response = app.response_class(
+        response=json.dumps(data),
+        status=200,
+        mimetype='application/json'
+    )
+
+    return response
+
+@app.route('/TCN2FBgn/<string:TCN>')
+def get_FBgn_Pheno(TCN):
+
+    FBgn_dict = get_FBgn(TCN)
+    FBgn_list = FBgn_dict[TCN]
+
+    beetle_GO_list =TCN_GO[TCN]
+
+    fly_GO_list_unformatted = []
+    for fbgn in FBgn_list:
+        fly_GO_list_unformatted.append(FBgn_GO[fbgn])
+
+    fly_GO_list_formatted = [j for i in fly_GO_list_unformatted for j in i]
+
+    tron_list = query_with_fetchone(TCN)
+
+    tron_list2 = []
+    for tron in tron_list:
+        tron_list2.append(get_tron(tron))
+
+    '''tron_list_formatted = [j for i in tron_list for j in i]'''
+
+    tron_descriptors = []
+    for tron in tron_list2:
+        tron_term = get_tron_descriptors(tron)[0]
+        if tron_term is not None and tron_term not in tron_descriptors and tron_term not in developemental_stages:
+            tron_descriptors.append(tron_term)
+
+    geno_list = []
+    for gene in FBgn_list:
+        geno_list = genotype[gene]
+
+    pheno_list = []
+    pheno_list_match = []
+    for gene in geno_list:
+        if phenotype.get(gene) is None:
+            continue
+        for structure in phenotype.get(gene):
+            if structure is not None and structure not in pheno_list:
+                pheno_list.append(structure)
+                pheno_list_match.append(structure.replace("pupal ", "").replace("adult ", '').replace("larva ", "").replace("embryo ",'').replace('embryonic', ''))
+
+    match_list = []
+
+    for tcas_structure in tron_descriptors:
+        if tcas_structure not in developemental_stages:
+            tcas_structure = tcas_structure.replace("pupal_", "").replace("adult_", '').replace("larva_", "").replace("embryo_",'')
+            if tcas_structure in pheno_list_match:
+                match_list.append(tcas_structure)
+
+    GO_terms_match = list(set(fly_GO_list_formatted) & set(beetle_GO_list))
+
+    data = {'TrOn_list': tron_list,
+            'TrOn_descriptors': tron_descriptors,
+            'TCN_to_FBgn': FBgn_list,
+            'FBgn_morph_pheno': pheno_list,
+            'TCN_GO_terms': beetle_GO_list,
+            'FBgn_GO_terms': fly_GO_list_formatted,
+            'Common': match_list,
+            'Shared_GO_terms': GO_terms_match}
     response = app.response_class(
         response=json.dumps(data),
         status=200,
@@ -160,4 +340,4 @@ def getPheno(FBgn):
     return response
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0')
