@@ -327,7 +327,6 @@ def get_update():
                 current_dl_name = current_release.readlines()[-1].strip()
 
                 if current_dl_name != current_name:
-                    print('Updating necessary files...')
 
                     ftp.cwd('precomputed_files/alleles/')
                     alleles_files = ftp.nlst()
@@ -338,18 +337,14 @@ def get_update():
                             local_filename = os.path.join(local_dir, f)
 
                             with open(local_filename, 'wb') as output:
-                                print('Downloading ' + f + '...')
                                 ftp.retrbinary('RETR %s' % f, output.write)
-                                print('Downloading complete!')
 
                         elif fnmatch.fnmatch(f, 'fbal_to_fbgn_fb_*'):
                             local_dir = os.path.dirname(os.path.realpath(__file__))
                             local_filename = os.path.join(local_dir, f)
 
                             with open(local_filename, 'wb') as output:
-                                print('Downloading ' + f + '...')
                                 ftp.retrbinary('RETR %s' % f, output.write)
-                                print('Downloading complete!')
 
                     ftp.cwd('../ontologies/')
 
@@ -361,19 +356,17 @@ def get_update():
                             local_filename = os.path.join(local_dir, f)
 
                             with open(local_filename, 'wb') as output:
-                                print('Downloading ' + f + '...')
                                 ftp.retrbinary('RETR %s' % f, output.write)
-                                print('Downloading complete!')
 
                     current_release.write(current_name + '\n')
 
+                    return 'Updated necessary files...'
+
                 else:
-                    print('Up to date!')
+                    return 'Already up to date!'
 
         except ftplib.all_errors as e:
             print('FTP error:', e)
-
-    return 'Up to date!'
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
