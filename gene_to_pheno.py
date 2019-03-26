@@ -174,7 +174,7 @@ with gzip.open('fbal_to_fbgn_fb_' + current_file_version + '.tsv.gz', 'rt', enco
 
 @app.route('/')
 def getStart():
-    return 'Please enter FBgn!'
+    return 'Please enter FBgn or TCN<br/>Examples: FBgn0003944'
 
 
 @app.route('/FBgn2TCN/<string:FBgn>')
@@ -287,6 +287,93 @@ def get_FBgn_Pheno(TCN):
     )
 
     return response
+
+
+@app.route('/version_control')
+def get_versions():
+
+    with FTP('ftp.flybase.org') as ftp:
+        try:
+            ftp.login()
+            ftp.cwd('/releases/current/')
+            files = ftp.nlst()
+            current_name = files[0].strip()
+
+            with open('current_release.txt', 'r+') as current_release:
+                current_dl_name = current_release.readlines()[-1].strip()
+
+        except ftplib.all_errors as e:
+            print('FTP error:', e)
+
+    response = "Version in use: " + current_dl_name + "<br/>Current version available: " + current_name + '<br/>To update, visit /update'
+
+    return response
+
+
+#"Version in use: " + current_dl_name + "<br/>Current version available: " + current_name
+
+
+@app.route('/update')
+def get_update():
+
+    with FTP('ftp.flybase.org') as ftp:
+        try:
+            ftp.login()
+            ftp.cwd('/releases/current/')
+            files = ftp.nlst()
+            current_name = files[0].strip()
+
+            with open('current_release.txt', 'r+') as current_release:
+                current_dl_name = current_release.readlines()[-1].strip()
+
+                if current_dl_name != current_name:
+                    print('Updating necessary files...')
+
+                    ftp.cwd('precomputed_files/alleles/')
+                    alleles_files = ftp.nlst()
+
+                    for f in alleles_files:
+                        if fnmatch.fnmatch(f, 'allele_phenotypic_data_fb_*'):
+                            local_dir = os.path.dirname(os.path.realpath(__file__))
+                            local_filename = os.path.join(local_dir, f)
+
+                            with open(local_filename, 'wb') as output:
+                                print('Downloading ' + f + '...')
+                                ftp.retrbinary('RETR %s' % f, output.write)
+                                print('Downloading complete!')
+
+                        elif fnmatch.fnmatch(f, 'fbal_to_fbgn_fb_*'):
+                            local_dir = os.path.dirname(os.path.realpath(__file__))
+                            local_filename = os.path.join(local_dir, f)
+
+                            with open(local_filename, 'wb') as output:
+                                print('Downloading ' + f + '...')
+                                ftp.retrbinary('RETR %s' % f, output.write)
+                                print('Downloading complete!')
+
+                    ftp.cwd('../ontologies/')
+
+                    ontology_files = ftp.nlst()
+
+                    for f in ontology_files:
+                        if fnmatch.fnmatch(f, 'fly_anatomy*'):
+                            local_dir = os.path.dirname(os.path.realpath(__file__))
+                            local_filename = os.path.join(local_dir, f)
+
+                            with open(local_filename, 'wb') as output:
+                                print('Downloading ' + f + '...')
+                                ftp.retrbinary('RETR %s' % f, output.write)
+                                print('Downloading complete!')
+
+                    current_release.write(current_name + '\n')
+
+                else:
+                    print('Up to date!')
+
+        except ftplib.all_errors as e:
+            print('FTP error:', e)
+
+    return 'Up to date!'
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')
