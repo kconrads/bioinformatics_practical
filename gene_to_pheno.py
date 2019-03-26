@@ -174,29 +174,6 @@ with gzip.open('fbal_to_fbgn_fb_' + current_file_version + '.tsv.gz', 'rt', enco
         cols = line.split("\t")
         genotype[cols[2]].append(cols[0])
 
-
-with open('gene_association.fb') as fly_GO:
-    for line in fly_GO:
-        if line.startswith("!"):
-            continue
-        cols = line.split("\t")
-        if (cols[1] not in FBgn_GO):
-            FBgn_GO[cols[1]] = []
-        GO_term = cols[4]
-        if (GO_term is not None):
-            FBgn_GO[cols[1]].append(GO_term)
-
-with open('GO_Annotation.tsv') as beetle_GO:
-    for line in beetle_GO:
-        if line.startswith("!"):
-            continue
-        cols = line.split("\t")
-        if (cols[1] not in TCN_GO):
-            TCN_GO[cols[1]] = []
-        GO_term = cols[4]
-        if (GO_term is not None):
-            TCN_GO[cols[1]].append(GO_term)
-
 @app.route('/')
 def getStart():
     return 'Please enter FBgn!'
@@ -207,14 +184,6 @@ def get_TCN_Pheno(FBgn):
 
     TCN_dict = get_TCN(FBgn)
     TCN_list = TCN_dict[FBgn]
-
-    fly_GO_list = FBgn_GO[FBgn]
-
-    beetle_GO_list_unformatted = []
-    for tcn in TCN_list:
-        beetle_GO_list_unformatted.append(TCN_GO[tcn])
-
-    beetle_GO_list_formatted = [j for i in beetle_GO_list_unformatted for j in i]
 
     tron_list = []
     for tcn in TCN_list:
@@ -253,16 +222,11 @@ def get_TCN_Pheno(FBgn):
             if tcas_structure in pheno_list_match:
                 match_list.append(tcas_structure)
 
-    GO_terms_match = list(set(fly_GO_list) & set(beetle_GO_list_formatted))
-
     data = {'FBgn_morph_pheno': pheno_list,
-            'FBgn_GO_terms': fly_GO_list,
             'FBgn_to_TCN': TCN_list,
-            'TCN_GO_terms': beetle_GO_list_formatted,
             'TrOn_list': tron_list_formatted,
             'TrOn_descriptors': tron_descriptors,
-            'Common': match_list,
-            'Shared_GO_terms': GO_terms_match}
+            'Common': match_list}
     response = app.response_class(
         response=json.dumps(data),
         status=200,
@@ -276,14 +240,6 @@ def get_FBgn_Pheno(TCN):
 
     FBgn_dict = get_FBgn(TCN)
     FBgn_list = FBgn_dict[TCN]
-
-    beetle_GO_list =TCN_GO[TCN]
-
-    fly_GO_list_unformatted = []
-    for fbgn in FBgn_list:
-        fly_GO_list_unformatted.append(FBgn_GO[fbgn])
-
-    fly_GO_list_formatted = [j for i in fly_GO_list_unformatted for j in i]
 
     tron_list = query_with_fetchone(TCN)
 
@@ -321,16 +277,11 @@ def get_FBgn_Pheno(TCN):
             if tcas_structure in pheno_list_match:
                 match_list.append(tcas_structure)
 
-    GO_terms_match = list(set(fly_GO_list_formatted) & set(beetle_GO_list))
-
     data = {'TrOn_list': tron_list,
             'TrOn_descriptors': tron_descriptors,
             'TCN_to_FBgn': FBgn_list,
             'FBgn_morph_pheno': pheno_list,
-            'TCN_GO_terms': beetle_GO_list,
-            'FBgn_GO_terms': fly_GO_list_formatted,
-            'Common': match_list,
-            'Shared_GO_terms': GO_terms_match}
+            'Common': match_list}
     response = app.response_class(
         response=json.dumps(data),
         status=200,
