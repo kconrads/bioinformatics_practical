@@ -76,8 +76,6 @@ genotype = defaultdict(list)
 ontology_terms = set()
 developemental_stages = ['pupa', 'pupa_male', 'pupa_female', 'adult', 'adult_female', 'adult_male', 'egg', 'mature_egg',
                          'larva', 'L1_larva', 'late_larva_(L5+)', 'L7_larva', 'embryo', 'prepupa']
-FBgn_GO = defaultdict(list)
-TCN_GO = defaultdict(list)
 
 # Splits text at any special character, takes first output
 def extract_morph_structure(x):
